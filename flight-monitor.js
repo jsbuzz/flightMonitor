@@ -58,11 +58,11 @@ define(
 		    ev.trackingId = flightMonitor.trackingId();
 		    ev.node = eventNode;
 
-		    var eventId = flightMonitor.config.showEventId ? '(#' + event.trackingId + ')' : '';
+		    var eventId = flightMonitor.config.showEventId ? '(#' + ev.trackingId + ')' : '';
 
 		    var elementInfo = flightMonitor.config.showElementInfo ? ev.target : '';
 		    flightMonitor.config.log(
-		    	'%c'+event.type + eventId + ' triggered by the User' + (elementInfo ? ' on' : ''),
+		    	'%c'+ev.type + eventId + ' triggered by the User' + (elementInfo ? ' on' : ''),
 		    	'color: red;',
 		    	elementInfo
 		    );
