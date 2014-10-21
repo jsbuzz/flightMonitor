@@ -16,26 +16,12 @@ define(
 		// flightMonitor object
 		var flightMonitor = {
 			_trackingId : 1,
+			_stopFlow : false,
 			trackingId : function() {
 				return this._trackingId++;
 			},
 			eventTree: {},
 			componentNodes : {},
-			createNode : function(type, name) {
-		        var node = {
-		            type: type,
-		            name: name
-		        };
-
-		        return node;
-		    },
-		    addNodeChild : function(parent, node) {
-		        if(!parent) {
-		            return;
-		        }
-		        (parent.children || (parent.children=[])).push(node);
-		        return node;
-		    },
 		    config: {
 		    	// default logging options
 		    	showElementInfo : true,
@@ -45,15 +31,50 @@ define(
 		    	showEventId : false,
 		    	showMixins  : false,
 		    	log         : function() { console.log.apply(console, arguments); }
+		    },
+		    stop : function() {
+		    	this._stopFlow = true;
+		    },
+		    step : function() {
+		    	if(!flightMonitor._caughtEvent) {
+		    		console.log('No events captured');
+		    		return;
+		    	}
+		    	var _caughtEvent = flightMonitor._caughtEvent;
+		    	flightMonitor._caughtEvent = false;
+		    	_caughtEvent.$element.trigger(
+		    		_caughtEvent.event,
+		    		_caughtEvent.data,
+		    		true
+		    	);
+		    },
+		    run: function() {
+		    	this._stopFlow = false;
+		    	this.step();
 		    }
 		};
 
+		function createNode(type, name) {
+	        var node = {
+	            type: type,
+	            name: name,
+				addChild : function(node) {
+			        (this.children || (this.children=[])).push(node);
+			        return node;
+			    }
+	        };
+
+	        return node;
+	    }
+
+
+
 		// click triggers a clean tracking
 		document.addEventListener('click', function(ev) {
-			var eventNode = flightMonitor.createNode('event', ev.type);
+			var eventNode = createNode('event', ev.type);
 
-			flightMonitor.eventTree = flightMonitor.createNode('component', 'User');
-		    flightMonitor.addNodeChild(flightMonitor.eventTree, eventNode);
+			flightMonitor.eventTree = createNode('component', 'User');
+		    flightMonitor.eventTree.addChild(eventNode);
 
 		    ev.trackingId = flightMonitor.trackingId();
 		    ev.node = eventNode;
@@ -100,18 +121,35 @@ define(
 		};
 
 		// monitor trigger calls
-		$.fn.trigger = function(event, data) {
+		$.fn.trigger = function(event, data, force) {
 			event = (typeof event === 'string' ? $.Event(event) : event);
+
+			if(flightMonitor._stopFlow && !force) {
+				flightMonitor.config.log(
+					'%cstopped event ' + event.type,
+					'color: red;',
+					'(call step or run to continue)'
+				);
+
+				flightMonitor._caughtEvent = {
+					$element: this,
+					event: event,
+					data: data
+				};
+
+				return ;
+			}
 
 			event.trackingId = flightMonitor.trackingId();
 			var eventId = flightMonitor.config.showEventId ? '(#' + event.trackingId + ')' : '';
 			var elementInfo = flightMonitor.config.showElementInfo ? this.get(0) : '';
 
 		    if(lastComponent) {
-		    	var eventNode = flightMonitor.createNode('event', event.type);
+		    	var eventNode = createNode('event', event.type);
 		    	var componentName = getComponentName(lastComponent.identity);
+		    	var componentNode = flightMonitor.componentNodes[componentName];
 
-		        flightMonitor.addNodeChild(flightMonitor.componentNodes[componentName], eventNode);
+		        componentNode && componentNode.addChild(eventNode);
 		        event.node = eventNode;
 
 		        flightMonitor.config.log(
@@ -147,9 +185,9 @@ define(
 					var eventNode = ev.node || ev.originalEvent && ev.originalEvent.node;
 
 					if(trackingId && eventNode) {
-						var componentNode = flightMonitor.createNode('component', componentName);
+						var componentNode = createNode('component', componentName);
 
-			            flightMonitor.addNodeChild(eventNode, componentNode);
+			            eventNode && eventNode.addChild(componentNode);
 			            flightMonitor.componentNodes[componentName] = componentNode;
 			            componentNode.method = fnName;
 					}
@@ -176,3 +214,4 @@ define(
 		return flightMonitor;
 	}
 );
+
