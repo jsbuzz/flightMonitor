@@ -1,17 +1,34 @@
 define(
 
   [
+  	'flight/lib/compose',
     'flight/lib/registry',
     'flight/lib/debug'
   ],
 
-  function(registry, debug) {
+  function(compose, registry, debug) {
 
 		'use strict';
 
-		// turn on flight debugger in silent mode to catch function checkSerializable
+		// turn on flight debugger in silent mode to force flight to use the withLogging mixin
 		debug.enable(true);
 		debug.events.logNone();
+
+		// overwrite compose.mixin to capture withLogging mixin
+		var lastComponent = null;
+		var _mixin = compose.mixin;
+		compose.mixin = function(component, mixins) {
+			for(var i=0; i < mixins.length; i++) {
+				if(mixins[i] && mixins[i].name === 'withLogging') {
+					mixins[i] = function flightMonitor() {
+						this.before('trigger', function() {
+						    lastComponent = this;
+						});
+					}
+				}
+			}
+			return _mixin.apply(this, arguments);
+		};
 
 		// flightMonitor object
 		var flightMonitor = {
@@ -29,7 +46,7 @@ define(
 
 		    	// extra options - if all turned on logging is a little too much
 		    	showEventId : false,
-		    	showMixins  : false,
+		    	showMixins  : true,
 		    	log         : function() { console.log.apply(console, arguments); }
 		    },
 		    stop : function() {
@@ -67,8 +84,6 @@ define(
 	        return node;
 	    }
 
-
-
 		// click triggers a clean tracking
 		document.addEventListener('click', function(ev) {
 			var eventNode = createNode('event', ev.type);
@@ -95,6 +110,7 @@ define(
 			var componentName = registry.components[componentIndex].component.toString(),
 				parts = componentName.split(', ');
 
+			//console.log(parts);
 			componentName = parts[1];
 			if(flightMonitor.config.showMixins) {
 				componentName += (parts.length > 2 ? '[' + parts.slice(2).join(',') + ']' : '');
@@ -108,17 +124,6 @@ define(
 
 			return componentName;
 		}
-
-		// this, my friends, is the biggest and ugliest hacks of all times...
-		var _call = Function.prototype.call;
-		var lastComponent = null;
-		Function.prototype.call = function(component) {
-			if(this.name === 'checkSerializable') {
-				lastComponent = component;
-			}
-
-			return _call.apply(this, arguments);
-		};
 
 		// monitor trigger calls
 		$.fn.trigger = function(event, data, force) {
@@ -214,4 +219,3 @@ define(
 		return flightMonitor;
 	}
 );
-
