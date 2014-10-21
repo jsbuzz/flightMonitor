@@ -7,6 +7,10 @@ A tracking library for FlightJS to monitor event flows
 Usage
 =====
 
+To install you can just use bower:
+
+    bower install flight-monitor
+
 Use require to load the library before setting up your flight components. This way it can hook into the event listeners.
 
     var flightMonitor = require('flightMonitor');
