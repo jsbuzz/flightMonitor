@@ -116,13 +116,13 @@ define(
 
 		        flightMonitor.config.log(
 		        	'%c' + event.type + eventId + ' triggered by ' + componentName, 'color: blue;',
-		        	'on',
+		        	(elementInfo ? ' on' : ''),
 		        	elementInfo
 		        );
 		    } else {
 		    	flightMonitor.config.log(
 		    		'%c' + event.type + eventId + ' triggered from outside', 'color: navy;',
-		    		'on',
+		    		(elementInfo ? ' on' : ''),
 		    		elementInfo
 		    	);
 		    }
