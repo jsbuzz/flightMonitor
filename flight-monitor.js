@@ -1,41 +1,25 @@
 define(
 
   [
+  	'flight/lib/compose',
     'flight/lib/registry',
     'flight/lib/debug'
   ],
 
-  function(registry, debug) {
+  function(compose, registry, debug) {
 
 		'use strict';
 
-		// turn on flight debugger in silent mode to catch function checkSerializable
-		debug.enable(true);
-		debug.events.logNone();
-
 		// flightMonitor object
+		var debugActions = [];
 		var flightMonitor = {
 			_trackingId : 1,
+			_stopFlow : false,
 			trackingId : function() {
 				return this._trackingId++;
 			},
 			eventTree: {},
 			componentNodes : {},
-			createNode : function(type, name) {
-		        var node = {
-		            type: type,
-		            name: name
-		        };
-
-		        return node;
-		    },
-		    addNodeChild : function(parent, node) {
-		        if(!parent) {
-		            return;
-		        }
-		        (parent.children || (parent.children=[])).push(node);
-		        return node;
-		    },
 		    config: {
 		    	// default logging options
 		    	showElementInfo : true,
@@ -44,16 +28,100 @@ define(
 		    	// extra options - if all turned on logging is a little too much
 		    	showEventId : false,
 		    	showMixins  : false,
+		    	showStopped : false,
 		    	log         : function() { console.log.apply(console, arguments); }
+		    },
+		    stop : function() {
+		    	this._stopFlow = true;
+		    },
+		    step : function() {
+		    	if(!debugActions.length) {
+		    		console.log('No events captured');
+		    		return;
+		    	}
+		    	debugActions.shift().trigger();
+		    },
+		    run: function() {
+		    	this._stopFlow = false;
+		    	while(debugActions.length) {
+		    		this.step();
+		    	}
 		    }
 		};
 
+		// turn on flight debugger in silent mode to force flight to use the withLogging mixin
+		debug.enable(true);
+		debug.events.logNone();
+
+		// overwrite compose.mixin to capture withLogging mixin
+		var lastComponent = null;
+		var _mixin = compose.mixin;
+		compose.mixin = function(component, mixins) {
+			for(var i=0; i < mixins.length; i++) {
+				if(mixins[i] && mixins[i].name === 'withLogging') {
+					mixins[i] = function flightMonitor() {
+						this.before('trigger', function() {
+						    lastComponent = this;
+						});
+					}
+				}
+			}
+			return _mixin.apply(this, arguments);
+		};
+
+		// debugger item for stepping the event flow
+		function debugAction(type) {
+			this.type = type;
+			if(this.type === 'callback') {
+				var componentName = arguments[1],
+					fn = arguments[2],
+					ev = arguments[3],
+					data = arguments[4];
+
+				this.trigger = function() {
+					flightMonitor.config.log(
+						'  >',
+						componentName,
+						'is listening for',
+						ev.type,
+						'and calling',
+						fn.target.name ? fn.target.name: fn.target.toString()
+					);
+					fn.call(fn, ev, data);
+				};
+			} else {
+				var component = arguments[1],
+					$element = arguments[2],
+				    event = arguments[3],
+			        data = arguments[4];
+
+				this.trigger = function() {
+					lastComponent = component;
+			    	$element.trigger(event,data,true);
+				};
+			}
+		}
+
+		// node generator for the eventTree data structure
+		function createNode(type, name) {
+	        var node = {
+	            type: type,
+	            name: name,
+				addChild : function(node) {
+			        (this.children || (this.children=[])).push(node);
+			        return node;
+			    }
+	        };
+
+	        return node;
+	    }
+
 		// click triggers a clean tracking
 		document.addEventListener('click', function(ev) {
-			var eventNode = flightMonitor.createNode('event', ev.type);
+			var eventNode = createNode('event', ev.type);
 
-			flightMonitor.eventTree = flightMonitor.createNode('component', 'User');
-		    flightMonitor.addNodeChild(flightMonitor.eventTree, eventNode);
+			flightMonitor.eventTree = createNode('component', 'User');
+		    flightMonitor.eventTree.addChild(eventNode);
 
 		    ev.trackingId = flightMonitor.trackingId();
 		    ev.node = eventNode;
@@ -74,6 +142,7 @@ define(
 			var componentName = registry.components[componentIndex].component.toString(),
 				parts = componentName.split(', ');
 
+			// parts[0] will be always 'flightMonitor'
 			componentName = parts[1];
 			if(flightMonitor.config.showMixins) {
 				componentName += (parts.length > 2 ? '[' + parts.slice(2).join(',') + ']' : '');
@@ -88,30 +157,30 @@ define(
 			return componentName;
 		}
 
-		// this, my friends, is the biggest and ugliest hacks of all times...
-		var _call = Function.prototype.call;
-		var lastComponent = null;
-		Function.prototype.call = function(component) {
-			if(this.name === 'checkSerializable') {
-				lastComponent = component;
-			}
-
-			return _call.apply(this, arguments);
-		};
-
 		// monitor trigger calls
-		$.fn.trigger = function(event, data) {
+		$.fn.trigger = function(event, data, force) {
 			event = (typeof event === 'string' ? $.Event(event) : event);
+
+			if(flightMonitor._stopFlow && !force) {
+				flightMonitor.config.showStopped && flightMonitor.config.log(
+					'%cstopped event ' + event.type,
+					'color: red;'
+				);
+
+				debugActions.push(new debugAction('trigger', lastComponent, this, event, data));
+				return ;
+			}
 
 			event.trackingId = flightMonitor.trackingId();
 			var eventId = flightMonitor.config.showEventId ? '(#' + event.trackingId + ')' : '';
 			var elementInfo = flightMonitor.config.showElementInfo ? this.get(0) : '';
 
 		    if(lastComponent) {
-		    	var eventNode = flightMonitor.createNode('event', event.type);
+		    	var eventNode = createNode('event', event.type);
 		    	var componentName = getComponentName(lastComponent.identity);
+		    	var componentNode = flightMonitor.componentNodes[componentName];
 
-		        flightMonitor.addNodeChild(flightMonitor.componentNodes[componentName], eventNode);
+		        componentNode && componentNode.addChild(eventNode);
 		        event.node = eventNode;
 
 		        flightMonitor.config.log(
@@ -141,15 +210,25 @@ define(
 			if(typeof callback === 'function' && callback.target && callback.context) {
 				var component = callback.context;
 				return originalFnOn.call(this, type, function(ev, data) {
+
 					var fnName = callback.target.name;
 					var componentName = getComponentName(component.identity);
 					var trackingId = ev.trackingId || ev.originalEvent && ev.originalEvent.trackingId;
 					var eventNode = ev.node || ev.originalEvent && ev.originalEvent.node;
 
-					if(trackingId && eventNode) {
-						var componentNode = flightMonitor.createNode('component', componentName);
+					if(flightMonitor._stopFlow) {
+						flightMonitor.config.showStopped && flightMonitor.config.log(
+							'%cstopped callback ' + (fnName || 'anonymus'),
+							'color: red;'
+						);
+						debugActions.push(new debugAction('callback', componentName, callback, ev, data));
+						return ;
+					}
 
-			            flightMonitor.addNodeChild(eventNode, componentNode);
+					if(trackingId && eventNode) {
+						var componentNode = createNode('component', componentName);
+
+			            eventNode && eventNode.addChild(componentNode);
 			            flightMonitor.componentNodes[componentName] = componentNode;
 			            componentNode.method = fnName;
 					}
