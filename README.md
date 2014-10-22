@@ -18,9 +18,10 @@ In order to use the library, please make sure you have the following rule in you
 
 Use require to load the library before setting up your flight components. This way it can hook into the event listeners.
 
-    var flightMonitor = require('flightMonitor');
+    var flightMonitor = require('bower_components/flight-monitor/flight-monitor');
     flightMonitor.config.showMethodInfo = false; // overwrite some default options
     
+    // components to track
     require('data/myDataComponent').attachTo(document);
     ...
     
