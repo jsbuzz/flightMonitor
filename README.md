@@ -36,8 +36,8 @@ With flightMonitor you can stop your flight app's event flow and continue step b
     $.flightMonitor.stop();
     
     $.flightMonitor.step();
-    /*
-      > ui/youComponent is listening for uiSomeEventWasTriggered and calling function (ev, data) { 
+    /* console:
+      > ui/yourComponent is listening for uiSomeEventWasTriggered and calling function (ev, data) { 
       ...
       }
     */
