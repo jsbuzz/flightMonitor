@@ -13,11 +13,30 @@ define(
 		// flightMonitor object
 		var debugActions = [];
 		var flightMonitor = {
-			_trackingId : 1,
-			_stopFlow : false,
-			trackingId : function() {
-				return this._trackingId++;
+			__trackingId : 1,
+			__stopFlow : false,
+			__stopPattern : null,
+			_stopOn : function(eventName) {
+				if(this.__stopFlow) {
+					return true;
+				}
+				else if(!eventName || !this.__stopPattern) {
+					return false;
+				}
+				else if(eventName.match(this.__stopPattern)) {
+					flightMonitor.config.log(
+						'%cStopped on event ' + eventName,
+						'color: red;'
+					);
+
+					return (this.__stopFlow = true);
+				}
 			},
+			_trackingId : function() {
+				return this.__trackingId++;
+			},
+
+			// public interface
 			eventTree: {},
 			componentNodes : {},
 		    config: {
@@ -32,20 +51,33 @@ define(
 		    	log         : function() { console.log.apply(console, arguments); }
 		    },
 		    stop : function() {
-		    	this._stopFlow = true;
+		    	this.__stopFlow = true;
+		    },
+		    breakOn : function(pattern) {
+		    	this.__stopPattern = pattern;
 		    },
 		    step : function() {
+		    	this.__stopFlow = true;
 		    	if(!debugActions.length) {
 		    		console.log('No events captured');
 		    		return;
 		    	}
 		    	debugActions.shift().trigger();
 		    },
-		    run: function() {
-		    	this._stopFlow = false;
-		    	while(debugActions.length) {
-		    		this.step();
+		    continue: function() {
+		    	if(!debugActions.length) {
+		    		console.log('No events captured');
+		    		return;
 		    	}
+
+		    	this.__stopFlow = false;
+		    	while(debugActions.length && !this.__stopFlow) {
+		    		debugActions.shift().trigger();
+		    	}
+		    },
+		    run : function() {
+		    	this.__stopPattern = false;
+		    	this.continue();
 		    }
 		};
 
@@ -123,7 +155,7 @@ define(
 			flightMonitor.eventTree = createNode('component', 'User');
 		    flightMonitor.eventTree.addChild(eventNode);
 
-		    ev.trackingId = flightMonitor.trackingId();
+		    ev.trackingId = flightMonitor._trackingId();
 		    ev.node = eventNode;
 
 		    var eventId = flightMonitor.config.showEventId ? '(#' + ev.trackingId + ')' : '';
@@ -161,7 +193,7 @@ define(
 		$.fn.trigger = function(event, data, force) {
 			event = (typeof event === 'string' ? $.Event(event) : event);
 
-			if(flightMonitor._stopFlow && !force) {
+			if(flightMonitor._stopOn(event.type) && !force) {
 				flightMonitor.config.showStopped && flightMonitor.config.log(
 					'%cstopped event ' + event.type,
 					'color: red;'
@@ -171,7 +203,7 @@ define(
 				return ;
 			}
 
-			event.trackingId = flightMonitor.trackingId();
+			event.trackingId = flightMonitor._trackingId();
 			var eventId = flightMonitor.config.showEventId ? '(#' + event.trackingId + ')' : '';
 			var elementInfo = flightMonitor.config.showElementInfo ? this.get(0) : '';
 
@@ -216,12 +248,13 @@ define(
 					var trackingId = ev.trackingId || ev.originalEvent && ev.originalEvent.trackingId;
 					var eventNode = ev.node || ev.originalEvent && ev.originalEvent.node;
 
-					if(flightMonitor._stopFlow) {
+					if(flightMonitor._stopOn()) {
 						flightMonitor.config.showStopped && flightMonitor.config.log(
 							'%cstopped callback ' + (fnName || 'anonymus'),
 							'color: red;'
 						);
 						debugActions.push(new debugAction('callback', componentName, callback, ev, data));
+						ev.preventDefault();
 						return ;
 					}
 
