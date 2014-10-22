@@ -10,6 +10,45 @@ define(
 
 		'use strict';
 
+		// flightMonitor object
+		var debugActions = [];
+		var flightMonitor = {
+			_trackingId : 1,
+			_stopFlow : false,
+			trackingId : function() {
+				return this._trackingId++;
+			},
+			eventTree: {},
+			componentNodes : {},
+		    config: {
+		    	// default logging options
+		    	showElementInfo : true,
+		    	showMethodInfo  : true,
+
+		    	// extra options - if all turned on logging is a little too much
+		    	showEventId : false,
+		    	showMixins  : false,
+		    	showStopped : false,
+		    	log         : function() { console.log.apply(console, arguments); }
+		    },
+		    stop : function() {
+		    	this._stopFlow = true;
+		    },
+		    step : function() {
+		    	if(!debugActions.length) {
+		    		console.log('No events captured');
+		    		return;
+		    	}
+		    	debugActions.shift().trigger();
+		    },
+		    run: function() {
+		    	this._stopFlow = false;
+		    	while(debugActions.length) {
+		    		this.step();
+		    	}
+		    }
+		};
+
 		// turn on flight debugger in silent mode to force flight to use the withLogging mixin
 		debug.enable(true);
 		debug.events.logNone();
@@ -30,47 +69,40 @@ define(
 			return _mixin.apply(this, arguments);
 		};
 
-		// flightMonitor object
-		var flightMonitor = {
-			_trackingId : 1,
-			_stopFlow : false,
-			trackingId : function() {
-				return this._trackingId++;
-			},
-			eventTree: {},
-			componentNodes : {},
-		    config: {
-		    	// default logging options
-		    	showElementInfo : true,
-		    	showMethodInfo  : true,
+		// debugger item for stepping the event flow
+		function debugAction(type) {
+			this.type = type;
+			if(this.type === 'callback') {
+				var componentName = arguments[1],
+					fn = arguments[2],
+					ev = arguments[3],
+					data = arguments[4];
 
-		    	// extra options - if all turned on logging is a little too much
-		    	showEventId : false,
-		    	showMixins  : true,
-		    	log         : function() { console.log.apply(console, arguments); }
-		    },
-		    stop : function() {
-		    	this._stopFlow = true;
-		    },
-		    step : function() {
-		    	if(!flightMonitor._caughtEvent) {
-		    		console.log('No events captured');
-		    		return;
-		    	}
-		    	var _caughtEvent = flightMonitor._caughtEvent;
-		    	flightMonitor._caughtEvent = false;
-		    	_caughtEvent.$element.trigger(
-		    		_caughtEvent.event,
-		    		_caughtEvent.data,
-		    		true
-		    	);
-		    },
-		    run: function() {
-		    	this._stopFlow = false;
-		    	this.step();
-		    }
-		};
+				this.trigger = function() {
+					flightMonitor.config.log(
+						'  >',
+						componentName,
+						'is listening for',
+						ev.type,
+						'and calling',
+						fn.target.name ? fn.target.name: fn.target.toString()
+					);
+					fn.call(fn, ev, data);
+				};
+			} else {
+				var component = arguments[1],
+					$element = arguments[2],
+				    event = arguments[3],
+			        data = arguments[4];
 
+				this.trigger = function() {
+					lastComponent = component;
+			    	$element.trigger(event,data,true);
+				};
+			}
+		}
+
+		// node generator for the eventTree data structure
 		function createNode(type, name) {
 	        var node = {
 	            type: type,
@@ -110,7 +142,7 @@ define(
 			var componentName = registry.components[componentIndex].component.toString(),
 				parts = componentName.split(', ');
 
-			//console.log(parts);
+			// parts[0] will be always 'flightMonitor'
 			componentName = parts[1];
 			if(flightMonitor.config.showMixins) {
 				componentName += (parts.length > 2 ? '[' + parts.slice(2).join(',') + ']' : '');
@@ -130,18 +162,12 @@ define(
 			event = (typeof event === 'string' ? $.Event(event) : event);
 
 			if(flightMonitor._stopFlow && !force) {
-				flightMonitor.config.log(
+				flightMonitor.config.showStopped && flightMonitor.config.log(
 					'%cstopped event ' + event.type,
-					'color: red;',
-					'(call step or run to continue)'
+					'color: red;'
 				);
 
-				flightMonitor._caughtEvent = {
-					$element: this,
-					event: event,
-					data: data
-				};
-
+				debugActions.push(new debugAction('trigger', lastComponent, this, event, data));
 				return ;
 			}
 
@@ -184,10 +210,20 @@ define(
 			if(typeof callback === 'function' && callback.target && callback.context) {
 				var component = callback.context;
 				return originalFnOn.call(this, type, function(ev, data) {
+
 					var fnName = callback.target.name;
 					var componentName = getComponentName(component.identity);
 					var trackingId = ev.trackingId || ev.originalEvent && ev.originalEvent.trackingId;
 					var eventNode = ev.node || ev.originalEvent && ev.originalEvent.node;
+
+					if(flightMonitor._stopFlow) {
+						flightMonitor.config.showStopped && flightMonitor.config.log(
+							'%cstopped callback ' + (fnName || 'anonymus'),
+							'color: red;'
+						);
+						debugActions.push(new debugAction('callback', componentName, callback, ev, data));
+						return ;
+					}
 
 					if(trackingId && eventNode) {
 						var componentNode = createNode('component', componentName);
