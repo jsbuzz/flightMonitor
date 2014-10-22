@@ -11,12 +11,16 @@ To install you can just use bower:
 
     bower install flight-monitor
 
+In order to use the library, please make sure you have the following rule in your requireJS paths config:
+
+    flight: 'bower_components/flight'
+
 Use require to load the library before setting up your flight components. This way it can hook into the event listeners.
 
     var flightMonitor = require('flightMonitor');
     flightMonitor.config.showMethodInfo = false; // overwrite some default options
     
-    require('data/documents').attachTo(document, { api: api });
+    require('data/myDataComponent').attachTo(document);
     ...
     
 
