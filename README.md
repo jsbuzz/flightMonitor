@@ -1,7 +1,8 @@
 flightMonitor
 =============
 
-A tracking library for FlightJS to monitor event flows
+A useful library for FlightJS to monitor and debug event flows.
+Provides more information than the basic flight debug tool and gives you the ability to break/step/continue execution of your event flow. The library cannot be used together with the default flight debug tool, as it is overwriting some parts of it.
 
 
 Usage
