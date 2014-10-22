@@ -26,7 +26,7 @@ And your logging is already in operation. Flight-monitor logs all events trigger
 Debuging
 ========
 
-With flightMonitor you can stop your flight app's event flow and go through it step by step. The library can stop all event triggers and callbacks as it is hooked into jQuery's trigger and has control over all callback calls.
+With flightMonitor you can stop your flight app's event flow and continue step by step. The library can stop all event triggers and callbacks as it is hooked into jQuery's trigger and has control over all callback calls.
 
     $.flightMonitor.stop();
     
