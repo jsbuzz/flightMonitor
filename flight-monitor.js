@@ -209,7 +209,8 @@ define(
 
 		    if(lastComponent) {
 		    	var eventNode = createNode('event', event.type);
-		    	var componentName = getComponentName(lastComponent.identity);
+		    	var componentIndex = lastComponent.componentIdentity || lastComponent.identity;
+		    	var componentName = getComponentName(componentIndex);
 		    	var componentNode = flightMonitor.componentNodes[componentName];
 
 		        componentNode && componentNode.addChild(eventNode);
@@ -240,11 +241,20 @@ define(
 			var element = this;
 			// is it a flight event handler?
 			if(typeof callback === 'function' && callback.target && callback.context) {
-				var component = callback.context;
+				var instanceIndex = callback.context.identity,
+					componentIndex = instanceIndex;
+
+				// as Flight is not kind enough to help us connect the instance to a component,
+				// we have to do it for ourselves...
+				if(instanceIndex >= registry.components.length) {
+					componentIndex = registry.components.length-1;
+					callback.context.componentIdentity = componentIndex;
+				}
+
 				return originalFnOn.call(this, type, function(ev, data) {
 
 					var fnName = callback.target.name;
-					var componentName = getComponentName(component.identity);
+					var componentName = getComponentName(componentIndex);
 					var trackingId = ev.trackingId || ev.originalEvent && ev.originalEvent.trackingId;
 					var eventNode = ev.node || ev.originalEvent && ev.originalEvent.node;
 
