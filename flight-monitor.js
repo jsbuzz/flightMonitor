@@ -45,11 +45,13 @@ define(
 		    	showMethodInfo  : true,
 
 		    	// extra options - if all turned on logging is a little too much
-		    	showEventId : false,
-		    	showMixins  : false,
-		    	showStopped : false,
-		    	log         : function() { console.log.apply(console, arguments); }
+		    	showDataInfo : false,
+		    	showEventId  : false,
+		    	showMixins   : false,
+		    	showStopped  : false,
+		    	log          : function() { console.log.apply(console, arguments); }
 		    },
+		    lastData : null,
 		    stop : function() {
 		    	this.__stopFlow = true;
 		    },
@@ -104,6 +106,7 @@ define(
 		// debugger item for stepping the event flow
 		function debugAction(type) {
 			this.type = type;
+
 			if(this.type === 'callback') {
 				var componentName = arguments[1],
 					fn = arguments[2],
@@ -202,10 +205,12 @@ define(
 				debugActions.push(new debugAction('trigger', lastComponent, this, event, data));
 				return ;
 			}
+			flightMonitor.lastData = data;
 
 			event.trackingId = flightMonitor._trackingId();
 			var eventId = flightMonitor.config.showEventId ? '(#' + event.trackingId + ')' : '';
 			var elementInfo = flightMonitor.config.showElementInfo ? this.get(0) : '';
+			var dataInfo = flightMonitor.config.showDataInfo ? data : '';
 
 		    if(lastComponent) {
 		    	var eventNode = createNode('event', event.type);
@@ -219,13 +224,15 @@ define(
 		        flightMonitor.config.log(
 		        	'%c' + event.type + eventId + ' triggered by ' + componentName, 'color: blue;',
 		        	(elementInfo ? ' on' : ''),
-		        	elementInfo
+		        	elementInfo,
+		        	dataInfo
 		        );
 		    } else {
 		    	flightMonitor.config.log(
 		    		'%c' + event.type + eventId + ' triggered from outside', 'color: navy;',
 		    		(elementInfo ? ' on' : ''),
-		    		elementInfo
+		    		elementInfo,
+		    		dataInfo
 		    	);
 		    }
 
