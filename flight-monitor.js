@@ -3,10 +3,11 @@ define(
   [
   	'flight/lib/compose',
     'flight/lib/registry',
-    'flight/lib/debug'
+    'flight/lib/debug',
+    './debugger.js'
   ],
 
-  function(compose, registry, debug) {
+  function(compose, registry, debug, debuggerTemplate) {
 
 		'use strict';
 
@@ -61,12 +62,19 @@ define(
 		    step : function() {
 		    	this.__stopFlow = true;
 		    	if(!debugActions.length) {
+		    		debuggerTemplate.hide();
 		    		console.log('No events captured');
 		    		return;
 		    	}
 		    	debugActions.shift().trigger();
+		    	if(debugActions.length) {
+		    		debuggerTemplate.attachTo(debugActions[0]);
+		    	} else {
+		    		debuggerTemplate.hide();
+		    	}
 		    },
 		    continue: function() {
+		    	debuggerTemplate.hide();
 		    	if(!debugActions.length) {
 		    		console.log('No events captured');
 		    		return;
@@ -83,8 +91,10 @@ define(
 		    }
 		};
 
+		debuggerTemplate.onClick = flightMonitor.step;
+
 		// turn on flight debugger in silent mode to force flight to use the withLogging mixin
-		debug.enable(true);
+		debug.enabled = true;
 		debug.events.logNone();
 
 		// overwrite compose.mixin to capture withLogging mixin
@@ -104,14 +114,15 @@ define(
 		};
 
 		// debugger item for stepping the event flow
-		function debugAction(type) {
+		function debugAction(type, el) {
 			this.type = type;
+			this.element = $(el).get(0);
 
 			if(this.type === 'callback') {
-				var componentName = arguments[1],
-					fn = arguments[2],
-					ev = arguments[3],
-					data = arguments[4];
+				var componentName = arguments[2],
+					fn = arguments[3],
+					ev = arguments[4],
+					data = arguments[5];
 
 				this.trigger = function() {
 					flightMonitor.config.log(
@@ -124,9 +135,12 @@ define(
 					);
 					fn.call(fn, ev, data);
 				};
+				this.toString = function() {
+					return 'calling ' + componentName  + '::' + (fn.target.name ? fn.target.name: fn.target.toString());
+				};
 			} else {
-				var component = arguments[1],
-					$element = arguments[2],
+				var $element = arguments[1],
+					component = arguments[2],
 				    event = arguments[3],
 			        data = arguments[4];
 
@@ -134,6 +148,13 @@ define(
 					lastComponent = component;
 			    	$element.trigger(event,data,true);
 				};
+				this.toString = function() {
+					return 'trigger ' + event.type  + ' by ' + getComponentName(component.componentIdentity || component.identity);
+				};
+			}
+
+			if(!debugActions.length) {
+				debuggerTemplate.attachTo(this);
 			}
 		}
 
@@ -153,6 +174,9 @@ define(
 
 		// click triggers a clean tracking
 		document.addEventListener('click', function(ev) {
+			if(debugActions.length) {
+				return;
+			}
 			var eventNode = createNode('event', ev.type);
 
 			flightMonitor.eventTree = createNode('component', 'User');
@@ -202,7 +226,7 @@ define(
 					'color: red;'
 				);
 
-				debugActions.push(new debugAction('trigger', lastComponent, this, event, data));
+				debugActions.push(new debugAction('trigger', this, lastComponent, event, data));
 				return ;
 			}
 			flightMonitor.lastData = data;
@@ -270,7 +294,7 @@ define(
 							'%cstopped callback ' + (fnName || 'anonymus'),
 							'color: red;'
 						);
-						debugActions.push(new debugAction('callback', componentName, callback, ev, data));
+						debugActions.push(new debugAction('callback', ev.target, componentName, callback, ev, data));
 						ev.preventDefault();
 						return ;
 					}
