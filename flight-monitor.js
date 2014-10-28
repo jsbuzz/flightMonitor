@@ -138,19 +138,22 @@ define(
 				this.toString = function() {
 					return 'calling ' + componentName  + '::' + (fn.target.name ? fn.target.name: fn.target.toString());
 				};
+				this.component = componentName;
 			} else {
 				var $element = arguments[1],
 					component = arguments[2],
 				    event = arguments[3],
-			        data = arguments[4];
+			        data = arguments[4],
+			        componentName = getComponentName(component.componentIdentity || component.identity);
 
 				this.trigger = function() {
 					lastComponent = component;
 			    	$element.trigger(event,data,true);
 				};
 				this.toString = function() {
-					return 'trigger ' + event.type  + ' by ' + getComponentName(component.componentIdentity || component.identity);
+					return 'trigger ' + event.type  + ' by ' + componentName;
 				};
+				this.component = componentName;
 			}
 
 			if(!debugActions.length) {
