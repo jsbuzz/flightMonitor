@@ -48,4 +48,10 @@ With flightMonitor you can stop your flight app's event flow and continue step b
     
     $.flightMonitor.run();
     
-A custom breakOn(pattern) method is being implemented now to allow you to stop on specific events and go step by step from there.
+There is a nice debug GUI which shows the active component on the page and the associated DOM element as well. The Step/Continue buttons appear on the bottom of the page and you can click through your application flow easily.
+
+![screenshot](https://raw.githubusercontent.com/jsbuzz/flightMonitor/master/flightMonitor-debug-gui.png)
+
+*Development in progress:*
+- setting watch for component attributes and alert when they change
+- trying to access callbacks from the flight this.on({ selector: callback }) method
