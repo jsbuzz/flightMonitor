@@ -26,6 +26,14 @@ Use require to load the library before setting up your flight components. This w
     ...
     
 
+*Logging flags*
+- **showElementInfo** :: shows the associated element [default true]
+- **showMethodInfo** :: shows the method name (or method body for anonym functions) [default true]
+- **showDataInfo** :: shows the data sent with the event [default false]
+- **showEventId** :: shows the #id number for the event so you can identify them easier [default false]
+- **showMixins** :: displays all mixins with the component name [default false]
+- **showStopped** :: when you step your flow this option will log you all stopped events and callbacks as they are queued up [default false]
+
 And your logging is already in operation. Flight-monitor logs all events triggered on the site and shows all components reacting to that event. It can show the method used in the component (if the method is named) and it is able to generate a data structure representing the event flow.
 
 ![screenshot](https://raw.githubusercontent.com/jsbuzz/flightMonitor/master/flightMonitor-screenshot-1.png)
