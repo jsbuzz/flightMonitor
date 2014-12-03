@@ -63,3 +63,4 @@ There is a nice debug GUI which shows the active component on the page and the a
 *Development in progress:*
 - setting watch for component attributes and alert when they change
 - trying to access callbacks from the flight this.on({ selector: callback }) method
+- visualization for the event flow - the data is already being collected in a processable format but the visualization is only in an alpha phase
